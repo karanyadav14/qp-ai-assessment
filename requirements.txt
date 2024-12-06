@@ -1,0 +1,9 @@
+langchain
+langchain_googledrive
+streamlit
+sentence_transformers
+tf-keras
+faiss-cpu
+pydrive
+pymilvus
+ollama
