@@ -1,5 +1,9 @@
 import os
 from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+
 
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
@@ -12,39 +16,37 @@ from utils.setup_milvus import (
     create_milvus_retriever
 )
 
-from utils.milvus_doc_insert import load_uploaded_documents, temp_write_uploaded_file
+from utils.milvus_doc_insert import load_uploaded_documents
 
 
 app = FastAPI()
 
-
-
 @app.post("/upload/")
-async def fastapi_upload_files(collection_name, file: UploadFile = File(...)):
+async def fastapi_upload_files(collection_name: str, file: UploadFile=File(...)):
     """
     Endpoint to upload a file and add its content to the vector database.
     """
-    print(dir(file)) 
+
     # Save uploaded file temporarily
     temp_dir = os.path.join(os.getcwd(), "temp")
     os.makedirs(temp_dir, exist_ok=True)
+    
     file_path = f"{temp_dir}/{file.filename}"
+    
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    load_uploaded_documents(
-    file_path,
+    collection = load_uploaded_documents(
+    [file_path],
     collection_name
     )
-    return file_path
-
-
+    return {"filename":file.filename, "collection_name":collection.name, "collection_entities":collection.num_entities}
 
 
 
 
 @app.post("/query/")
-async def query_documents(query, collection_name):
+async def query_documents(collection_name:str, query:str):
 
     vectorstore = create_milvus_retriever(collection_name)
     try:
@@ -99,3 +101,6 @@ async def query_documents(query, collection_name):
 
 
 
+# @app.exception_handler(500)
+# async def internal_exception_handler(request: Request, exc: Exception):
+#   return JSONResponse(status_code=500, content=jsonable_encoder({"code": 500, "msg": "Internal Server Error"}))

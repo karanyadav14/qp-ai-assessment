@@ -15,6 +15,7 @@ from utils.setup_milvus import (
 
 
 
+
 @app.post("/query/")
 def query_documents(query, collection_name):
 

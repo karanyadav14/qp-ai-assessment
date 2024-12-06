@@ -1,10 +1,10 @@
 import streamlit as st
 import asyncio
-
+import requests
 from dotenv import load_dotenv
 
 # from utils.contextual_query import query_documents
-from utils.fastapi_integration import fastapi_upload_files, query_documents
+from fastapi_integration import fastapi_upload_files, query_documents
 from utils.milvus_doc_insert import load_uploaded_documents, temp_write_uploaded_file
 import os
 
@@ -20,7 +20,7 @@ load_dotenv(dotenv_path=".env", override=True)
     
 collection_name = "multi_file_collection"
 embedder_model="all-MiniLM-L6-v2"
-
+API_URL = "http://127.0.0.1:8000"
 
 def construct_prompt_with_memory(messages, current_query, max_tokens=2048):
     """
@@ -81,20 +81,37 @@ if "messages" not in st.session_state:
 
 
 # File Uploader
+
+
+# uploaded_files = temp_write_uploaded_file(files)
+# load_uploaded_documents(uploaded_files, collection_name, embedder_model)
+# uploaded_files = []
+# for file in files:
+#     file_path = asyncio.run(fastapi_upload_files(collection_name, file))
+#     uploaded_files.append(file_path)
+
+
+
+
 files = st.file_uploader(
     "Upload your documents (PDF, CSV, TXT):",
     type=["pdf", "csv", "txt", "md"],
     accept_multiple_files=True,
 )
 
-# uploaded_files = temp_write_uploaded_file(files)
-# load_uploaded_documents(uploaded_files, collection_name, embedder_model)
-uploaded_files = []
-for file in files:
-    file_path = asyncio.run(fastapi_upload_files(collection_name, file))
-    uploaded_files.append(file_path)
+if files is not None:
+    for uploaded_file in files:
+        with st.spinner(f"Uploading file {uploaded_file.name}..."):
 
-st.markdown("---")  # Separator for better organization
+            payload = {"collection_name": collection_name}
+            files = {"file": uploaded_file}
+            response = requests.post(f"{API_URL}/upload/", params=payload, files=files)
+            if response.status_code == 200:
+                st.success(f"{response.json()['filename']} file successfully uploaded to vector db collection: {response.json()['collection_name']}")
+            else:
+                st.error(f"{uploaded_file} file upload failed.")
+
+st.markdown ("---")  # Separator for better organization
 
 
 
@@ -118,16 +135,20 @@ if prompt := st.chat_input("Type your query here:"):
     with st.chat_message("user"):
         st.write(prompt)
 
-    if uploaded_files:
+    if files:
         with st.chat_message("assistant"):
             with st.spinner("Searching through uploaded documents..."):
                 
-                # prompt_with_memory = construct_prompt_with_memory(
-                #     st.session_state.messages, prompt
-                # )
-                response = asyncio.run(query_documents(prompt, collection_name))
+
                 
-                st.write(f"Answer: {response.json()["response"]}")
+                payload = {"query": prompt, "collection_name": collection_name}
+                response = requests.post(f"{API_URL}/query/", params=payload)
+                
+                if response.status_code == 200:
+                    st.write(f"Answer: {response.json()}")
+                else:
+                    st.error(f"{response} failed to query.")
+                
                 
                 st.session_state.messages.append(
                     {"role": "assistant", "content": response}

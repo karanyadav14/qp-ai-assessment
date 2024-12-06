@@ -61,11 +61,14 @@ def load_uploaded_documents(
         else:
             st.warning(f"No content found in file: {uploaded_file}")
 
+    try:
+        # Connect to Milvus and create the collection
+        collection = create_milvus_collection(
+            collection_name, dim=384
+        )  
 
-    # Connect to Milvus and create the collection
-    collection = create_milvus_collection(
-        collection_name, dim=384
-    )  
-
-    # Insert documents into Milvus
-    load_documents_to_milvus(collection, all_docs, embedder_model)
+        # Insert documents into Milvus
+        load_documents_to_milvus(collection, all_docs, embedder_model)
+        return collection
+    except:
+        return "Failed to insert doc into vector db."

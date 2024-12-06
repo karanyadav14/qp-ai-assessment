@@ -61,7 +61,9 @@ def load_documents_to_milvus(collection, documents, embedder_model="all-MiniLM-L
     collection.insert(
         [normalized_embeddings, texts]
     )  ## Indexing will be handled by collection.create_index method
+    collection.flush()
     collection.load()
+
 
 
 
