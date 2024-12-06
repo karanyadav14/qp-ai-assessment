@@ -14,7 +14,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 
 import warnings
 warnings.filterwarnings("ignore")
-
+from langsmith import traceable
 
 
 def create_milvus_collection(collection_name, dim):
@@ -47,6 +47,10 @@ def create_milvus_collection(collection_name, dim):
     return collection
 
 
+
+
+
+
 def load_documents_to_milvus(collection, documents, embedder_model="all-MiniLM-L6-v2"):
     embedder = SentenceTransformer(embedder_model)
     texts = [doc.page_content for doc in documents]
@@ -58,6 +62,10 @@ def load_documents_to_milvus(collection, documents, embedder_model="all-MiniLM-L
         [normalized_embeddings, texts]
     )  ## Indexing will be handled by collection.create_index method
     collection.load()
+
+
+
+
 
 
 def search_milvus(collection_name, query, embedder_model="all-MiniLM-L6-v2", top_k=5):
@@ -93,6 +101,11 @@ def search_milvus(collection_name, query, embedder_model="all-MiniLM-L6-v2", top
     return formatted_results
 
 
+
+
+
+
+@traceable(run_type="retriever")
 def create_milvus_retriever(
     collection_name,
     milvus_host="127.0.0.1",
@@ -116,3 +129,7 @@ def create_milvus_retriever(
     except Exception as e:
         print(f"Error creating Milvus retriever: {e}")
         return None
+
+
+
+
