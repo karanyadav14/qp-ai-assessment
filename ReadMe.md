@@ -1,5 +1,8 @@
 ### InsightPro: Retrieval Augmented Generation (RAG) based Contextual Chat Bot  
 
+-  This chatbot allows you to upload multiple files and query them using the local LLaMA models.
+  
+
 ##### Tools Used
 
 - LLMs: LLaMA2, LLaMA3.1
@@ -26,7 +29,6 @@ pip install -r requirements.txt
 
 #### 1. Ollama
 ```
-pip install ollama
 ollama pull llama2
 ollama pull llama3.1
 ```
