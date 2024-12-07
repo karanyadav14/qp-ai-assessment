@@ -22,7 +22,6 @@ git clone git@github.com:karanyadav14/qp-ai-assessment.git
 cd qp-ai-assessment
 ENV_NAME=myenv && python3 -m venv $ENV_NAME && source $ENV_NAME/bin/activate && pip install ipykernel && python -m ipykernel install --user --name=$ENV_NAME
 pip install -r requirements.txt
-uvicorn fastapi_integration:app --reload
 ```
 
 #### 1. Ollama
@@ -40,8 +39,12 @@ bash standalone_embed.sh start
 ```
 
 - If asked for passward, enter system passward for admin access
-   
 
+
+#### 3. Launch FastAPI endpoint
+```
+uvicorn fastapi_integration:app --reload
+```
 
 
 
@@ -53,5 +56,7 @@ streamlit run main.py --server.maxUploadSize 10
 ```
 
 
-### Demo:
 
+### Error Handling
+- ERROR while file upload: Failed to upload <file>: HTTPConnectionPool(host='127.0.0.1', port=8000)
+  - Ensure FastAPI server is up and running

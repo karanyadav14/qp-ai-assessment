@@ -21,7 +21,7 @@ from utils.wrappers import (
 
 
 # Define global variables    
-collection_name = "multi_file_collection"
+collection_name = "insightpro_collection"
 embedder_model="all-MiniLM-L6-v2"
 API_URL = "http://127.0.0.1:8000"
 
