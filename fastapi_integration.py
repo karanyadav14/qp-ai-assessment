@@ -1,10 +1,9 @@
 import os
 from fastapi import FastAPI, UploadFile, File
-from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-
+from langchain.chains import ConversationalRetrievalChain
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -13,10 +12,13 @@ from langchain_community.llms import Ollama
 
 
 from utils.setup_milvus import (
-    create_milvus_retriever
+    create_milvus_retriever,
+    search_milvus
 )
-
 from utils.milvus_doc_insert import load_uploaded_documents
+
+
+
 
 
 app = FastAPI()
@@ -35,28 +37,36 @@ async def fastapi_upload_files(collection_name: str, file: UploadFile=File(...))
     
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
-
+    
     collection = load_uploaded_documents(
     [file_path],
     collection_name
     )
-    return {"filename":file.filename, "collection_name":collection.name, "collection_entities":collection.num_entities}
+    return {"filename":file.filename, "collection":collection}
 
 
 
 
 @app.post("/query/")
-async def query_documents(collection_name:str, query:str):
+async def query_documents_using_llm(params:dict):
 
-    vectorstore = create_milvus_retriever(collection_name)
+    collection_name = params["collection_name"]
+    query = params["query"]
+    hyperparams = params["hyperparams"]
+
+    
     try:
-        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
-
+        
+        # Define prompt - future scope: pass through front end
         prompt_template = """
-                Instructions: You are humble and polite AI assistant. Given following context in context tag respond to question.
+                Instructions: You are humble and polite AI assistant. 
+                Given following context in context tag respond to question.
                 The response should be specific and concise. Keep answers around context provided.
-                If question is outside of context provided or if you don't know the answer, just say that you don't know in a single line.
+                If question is outside of context provided or if you don't know the answer, 
+                just politely say that you don't know the answer in a single line.
                 Don't try to make up an answer.
+                Return answer in plain text instead of json.
+
                 <context>
                 {context}
                 </context>
@@ -72,31 +82,60 @@ async def query_documents(collection_name:str, query:str):
             input_variables = ["context", "question"]
         )
 
-        # Query the LLM
-        llm = Ollama(model="llama2")
-        retriever = vectorstore.as_retriever()
-
-        def format_docs(docs):
-            return "\n\n".join(doc.page_content for doc in docs)
+        # Define ollama based llm model
+        if hyperparams["hyperparam_tune"]=="Yes":
+            llm = Ollama(
+                model=hyperparams["model"],
+                temperature=hyperparams["temperature"],
+                top_p=hyperparams["top_p"]
+                )
+        else:
+            llm = Ollama(
+                model=hyperparams["model"]
+                )
         
+        # Top_k semantically similar (cosine similarity) chunks as a context
+        retriever = create_milvus_retriever(
+                            collection_name,
+                            milvus_host="127.0.0.1",
+                            milvus_port="19530",
+                            embedder_model="all-MiniLM-L6-v2",
+                            top_k = 3
+                        )
+        retrieved_context = retriever.retrieve_top_k(query, top_k=3)
+        
+        # Define chain
         rag_chain = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
             | prompt
             | llm
             | StrOutputParser()
         )
 
         # Invoke the RAG chain with a question to get the response
-        res = rag_chain.invoke(query)
+        res = rag_chain.invoke({"context": retrieved_context, "question": query})
+
+        
+        # Future scope: memory integration
+        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
         memory.save_context({"input":query},{"output":res})
         # memory.add_user_message(query)
         # memory.add_ai_message(res)
 
         return res
+    
     except Exception as e:
-        # st.error(f"Search failed: {str(e)}")
         return f"Search failed: {str(e)}"
 
+
+
+
+## Semantic similarity post request
+@app.post("/semantic_similarity_search/")
+async def semantic_similarity_search(params:dict):
+    collection_name = params["collection_name"]
+    query = params["query"]
+    return search_milvus(collection_name, query)
 
 
 

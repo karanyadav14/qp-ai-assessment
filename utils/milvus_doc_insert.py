@@ -32,11 +32,15 @@ def temp_write_uploaded_file(files):
     return uploaded_files
 
 
+
+
+
 def load_uploaded_documents(
     uploaded_files,
     collection_name,
      embedder_model="all-MiniLM-L6-v2"
-):
+):  
+    # try:
     all_docs = []
 
     for uploaded_file in uploaded_files:
@@ -49,10 +53,11 @@ def load_uploaded_documents(
             loader = CSVLoader(uploaded_file)
         elif file_extension in [".txt", ".md"]:
             loader = TextLoader(uploaded_file)
+
         else:
             st.warning(f"Unsupported file type: {file_extension}")
             continue
-
+    
         documents = loader.load()
         if documents:
             splitter = RecursiveCharacterTextSplitter(chunk_size=650, chunk_overlap=50)
@@ -61,14 +66,14 @@ def load_uploaded_documents(
         else:
             st.warning(f"No content found in file: {uploaded_file}")
 
-    try:
-        # Connect to Milvus and create the collection
-        collection = create_milvus_collection(
-            collection_name, dim=384
-        )  
 
-        # Insert documents into Milvus
-        load_documents_to_milvus(collection, all_docs, embedder_model)
-        return collection
-    except:
-        return "Failed to insert doc into vector db."
+    # Connect to Milvus and create the collection
+    collection = create_milvus_collection(
+        collection_name, dim=384
+    )  
+
+    # Insert documents into Milvus
+    load_documents_to_milvus(collection, all_docs, embedder_model)
+    return collection
+    # except Exception as e:
+    #     return f"Failed to insert doc into vector db: {str(e)}"

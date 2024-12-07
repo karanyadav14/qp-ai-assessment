@@ -8,13 +8,13 @@ from pymilvus import (
 )
 from sentence_transformers import SentenceTransformer
 import numpy as np
-
 from langchain.vectorstores import Milvus
 from langchain.embeddings import HuggingFaceEmbeddings
-
+from langsmith import traceable
 import warnings
 warnings.filterwarnings("ignore")
-from langsmith import traceable
+
+
 
 
 def create_milvus_collection(collection_name, dim):
@@ -70,7 +70,7 @@ def load_documents_to_milvus(collection, documents, embedder_model="all-MiniLM-L
 
 
 
-def search_milvus(collection_name, query, embedder_model="all-MiniLM-L6-v2", top_k=5):
+def search_milvus(collection_name, query, embedder_model="all-MiniLM-L6-v2", top_k=3):
     embedder = SentenceTransformer(embedder_model)
     query_embedding = embedder.encode([query])
 
@@ -95,7 +95,7 @@ def search_milvus(collection_name, query, embedder_model="all-MiniLM-L6-v2", top
     # Format the output: similarity score followed by the text
     formatted_results = "\n".join(
         [
-            f"Cosine similarity score: {score:.4f} \nResponse: {text}\n\n"
+            f"Cosine similarity score: {score:.4f} \n\nRelevant Chunk: {text}\n\n"
             for score, text in sorted_results
         ]
     )
@@ -113,10 +113,10 @@ def create_milvus_retriever(
     milvus_host="127.0.0.1",
     milvus_port="19530",
     embedder_model="all-MiniLM-L6-v2",
+    top_k = 3
 ):
 
     try:
-
         embeddings = HuggingFaceEmbeddings(model_name=embedder_model)
 
         # Create Milvus retriever
@@ -124,10 +124,23 @@ def create_milvus_retriever(
             embedding_function=embeddings,
             collection_name=collection_name,
             connection_args={"host": milvus_host, "port": milvus_port},
-            vector_field="embedding"
+            vector_field="embedding",
         )
 
+        def retrieve_top_k(query, top_k=3):
+            """
+            Retrieve the top k semantically similar documents for a given query.
+            """
+            results = retriever.similarity_search(query, k=top_k)
+            formatted_results = "\n\n".join(
+                f"Document {i+1}:\n{doc.page_content}" for i, doc in enumerate(results)
+            )
+            return formatted_results
+
+        # Attach the retrieval function
+        retriever.retrieve_top_k = retrieve_top_k
         return retriever
+
     except Exception as e:
         print(f"Error creating Milvus retriever: {e}")
         return None
