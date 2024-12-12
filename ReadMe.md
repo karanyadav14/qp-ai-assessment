@@ -28,6 +28,9 @@ pip install -r requirements.txt
 ```
 
 #### 1. Ollama
+
+Download Ollama : [Link](https://ollama.com/)
+
 ```
 ollama pull llama2
 ollama pull llama3.1
