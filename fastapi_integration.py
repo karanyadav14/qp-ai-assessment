@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from fastapi import FastAPI, UploadFile, File
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -10,6 +11,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain.memory import ConversationBufferMemory
 from langchain_community.llms import Ollama
 
+import giskard
+from giskard import Dataset, Model
 
 from utils.setup_milvus import (
     create_milvus_retriever,
@@ -117,12 +120,12 @@ async def query_documents_using_llm(params:dict):
 
         
         # Future scope: memory integration
-        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
-        memory.save_context({"input":query},{"output":res})
+        # memory = ConversationBufferMemory(memory_key="history", return_messages=True)
+        # memory.save_context({"input":query},{"output":res})
         # memory.add_user_message(query)
         # memory.add_ai_message(res)
 
-        return res
+        return {"res":res, "retriever":retriever, "rag_chain":rag_chain}
     
     except Exception as e:
         return f"Search failed: {str(e)}"
@@ -136,6 +139,38 @@ async def semantic_similarity_search(params:dict):
     collection_name = params["collection_name"]
     query = params["query"]
     return search_milvus(collection_name, query)
+
+
+
+
+## Evaluate model responses
+@app.post("/eval/")
+async def evaluate_response(params:dict):
+
+    query = params["query"]
+    eval_type = params["eval_type"]
+    retriever = params["retriever"]
+    rag_chain = params["rag_chain"]
+
+    retrieved_context = retriever.retrieve_top_k(query, top_k=3)
+
+    def model_predict(df:pd.DataFrame):
+        return [rag_chain.invoke({"context": row["retrieved_context"], "question": row["query"]}) for _, row in df.iterrows()]
+    
+    
+    giskard_model = giskard.Model(
+                model=model_predict,
+                model_type="text_generation",
+                name="RAG based Question Answering",
+                description="This model answers any question related to context provided",
+                feature_names=["retrieved_context", "query"],
+            )
+
+    giskard_dataset = giskard.Dataset(pd.DataFrame({"query": [query], "retrieved_context":[retrieved_context]}), target=None)
+
+    report = giskard.scan(giskard_model, giskard_dataset, only=eval_type)
+    
+    return report
 
 
 
